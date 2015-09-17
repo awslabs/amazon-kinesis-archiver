@@ -1,0 +1,1 @@
+# amazon-kinesis-stream-compressor
