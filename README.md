@@ -32,6 +32,10 @@ node createDynamoTable
 
 which will prompt for AWS Region, Stream Name, and the required read and write IOPS. You should set the Write IOPS to Kinesis Open Shard Count * 1000 to ensure that the Stream compressor doesn't fall behind the 'head' of the Stream.
 
+## Deploying
+
+To deploy this functionality to AWS Lambda, create a new Lambda function using the [KinesisStreamCompressor-1.0.0.zip](dist/KinesisStreamCompressor-1.0.0.zip]. Then, create a new Event Source Mapping for your function that references the desired Kinesis Stream to be archived. Please keep in mind that a single Lambda deployment can handle processing multiple Kinesis Streams, so you can create multiple event sources for a single function.
+
 ## Testing
 
 You can test the module with ```test.js``` which allows you type in a dummy Kinesis Record Set and then allows running with ```node test```. 
