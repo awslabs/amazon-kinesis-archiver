@@ -14,7 +14,9 @@ var by_item = function(callback) {
 	}
     }, function(err) {
 	console.log("Query by Item Complete");
-	console.log(err);
+	if (err) {
+	    console.log(err);
+	}
 	callback(err);
     });
 };
@@ -29,7 +31,9 @@ var by_range = function(callback) {
 	}
     }, function(err) {
 	console.log("Query by Range Complete");
-	console.log(err);
+	if (err) {
+	    console.log(err);
+	}
 	callback(err);
     });
 };
