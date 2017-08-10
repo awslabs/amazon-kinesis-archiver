@@ -1,7 +1,7 @@
 var readline = require('readline');
 var async = require('async');
-require("./constants");
-var common = require("./common");
+require("./lib/constants");
+var common = require("./lib/common");
 var aws = require('aws-sdk');
 var ec2 = new aws.EC2({
     apiVersion : '2016-11-15',
