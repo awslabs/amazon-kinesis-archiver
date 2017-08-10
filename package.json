@@ -1,9 +1,9 @@
 {
     "name": "kinesis-stream-compressor",
     "description": "An AWS Lambda function stores only latest unique values of a Kinesis Stream, for the purposes of archive/replay",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "dependencies": {
-   		"async": "0.9.0"
+   		"async": "2.1.5"
     },
     "keywords": [
         "amazon",
@@ -19,6 +19,9 @@
     "license" : "Apache-2.0",
     "files": [
         "index.js",
+        "constants.js",
+        "common.js",
+        "streamCompressor.js",
         "package.json",
         "README.md",
         "LICENSE.txt"

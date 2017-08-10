@@ -1,149 +1,166 @@
 var readline = require('readline');
-var aws = require('aws-sdk');
 var async = require('async');
+require("./constants");
+var common = require("./common");
+var aws = require('aws-sdk');
+var ec2 = new aws.EC2({
+    apiVersion : '2016-11-15',
+    region : "us-east-1"
+});
 
 /* configuration of question prompts and config assignment */
 var rl = readline.createInterface({
-	input : process.stdin,
-	output : process.stdout
+    input : process.stdin,
+    output : process.stdout
 });
 
-var tableName;
-var setRegion;
-var writeIOPS;
-var readIOPS;
-var qs = [];
-var dynamoDB;
+var _streamName;
+var _archiveMode;
+var _tableName;
+var _setRegion;
+var _writeIOPS;
+var _readIOPS;
+var _ttlSeconds;
 
 q_region = function(callback) {
-	rl.question('Enter the Region for the Compressed Table > ', function(answer) {
-		if (exports.blank(answer) !== null) {
-			exports.validateArrayContains([ "ap-northeast-1", "ap-southeast-1", "ap-southeast-2", "eu-central-1",
-					"eu-west-1", "sa-east-1", "us-east-1", "us-west-1", "us-west-2" ], answer.toLowerCase(), rl);
+    rl.question('Enter the Region for the Compressed Table > ', function(answer) {
+	if (exports.blank(answer) !== null) {
+	    ec2.describeRegions({}, function(err, data) {
+		if (err) {
+		    callback(err);
+		} else {
+		    // load all the regions
+		    var regions = [];
+		    data.Regions.map(function(item) {
+			regions.push(item.RegionName);
+		    });
+		    exports.validateArrayContains(regions, answer.toLowerCase(), function(err) {
+			if (err) {
+			    callback(err);
+			} else {
+			    _setRegion = answer.toLowerCase();
 
-			setRegion = answer.toLowerCase();
-
-			// configure dynamo db and kms for the correct region
-			dynamoDB = new aws.DynamoDB({
-				apiVersion : '2012-08-10',
-				region : setRegion
-			});
-
-			callback(null);
+			    callback(null);
+			}
+		    });
 		}
-	});
+	    });
+	} else {
+	    callback("You must provide a region");
+	}
+    });
 };
 
-q_tableName = function(callback) {
-	rl.question('Enter the Stream Name > ', function(answer) {
-		if (exports.blank(answer) !== null) {
-			tableName = answer + "-compressed";
+q_streamName = function(callback) {
+    rl.question('Enter the Stream Name > ', function(answer) {
+	if (exports.blank(answer) !== null) {
+	    _streamName = answer;
 
-			callback(null);
-		}
-	});
+	    callback(null);
+	} else {
+	    callback("You must provide a Stream Name");
+	}
+    });
+};
+
+q_archiveMode = function(callback) {
+    rl.question('Enter the Archive Mode required (all | latest) > ', function(answer) {
+	if (!answer || (answer !== RECOVERY_MODE_LATEST && answer !== RECOVERY_MODE_ALL)) {
+	    callback("Archive Mode must be one of " + RECOVERY_MODE_LATEST + " or " + RECOVERY_MODE_ALL);
+	} else {
+	    // set the table name & mode
+	    _archiveMode = answer;
+	    _tableName = common.getTargetTablename(_streamName, answer);
+	    callback(null);
+	}
+    });
+};
+
+q_setTTL = function(callback) {
+    rl.question('Should data expire from the archive table? If yes enter the interval to retain in seconds > ', function(answer) {
+	if (!answer) {
+	    callback(null);
+	} else {
+	    _ttlSeconds = parseInt(answer);
+	    callback(null);
+	}
+    });
 };
 
 q_readIOPS = function(callback) {
-	rl.question('How Many Read IOPS do you require? > ', function(answer) {
-		if (exports.blank(answer) !== null) {
-			readIOPS = exports.getIntValue(answer);
+    rl.question('How Many Read IOPS do you require? > ', function(answer) {
+	if (exports.blank(answer) !== null) {
+	    _readIOPS = exports.getIntValue(answer);
 
-			callback(null);
-		}
-	});
+	    callback(null);
+	} else {
+	    callback("You must provide the required amount of Read IOPS");
+	}
+    });
 };
 
 q_writeIOPS = function(callback) {
-	rl.question('How Many Write IOPS do you require? > ', function(answer) {
-		if (exports.blank(answer) !== null) {
-			writeIOPS = exports.getIntValue(answer);
+    rl.question('How Many Write IOPS do you require? > ', function(answer) {
+	if (exports.blank(answer) !== null) {
+	    _writeIOPS = exports.getIntValue(answer);
 
-			callback(null);
-		}
-	});
-};
-
-last = function(callback) {
-	rl.close();
-
-	exports.createTables();
-};
-
-exports.validateArrayContains = function(array, value, rl) {
-	if (!(array.indexOf(value) > -1)) {
-		rl.close();
-		console.log('Value must be one of ' + array.toString());
-		process.exit(INVALID_ARG);
+	    callback(null);
+	} else {
+	    callback("You must provide the required amount of Write IOPS");
 	}
+    });
+};
+
+last = function(err, callback) {
+    rl.close();
+
+    if (err) {
+	console.log(err);
+    } else {
+	common.createTables(_setRegion, _tableName, _archiveMode, _readIOPS, _writeIOPS, _ttlSeconds, function(err) {
+	    if (err) {
+		console.log(err);
+		process.exit(ERROR);
+	    } else {
+		process.exit(OK);
+	    }
+	});
+    }
+};
+
+exports.validateArrayContains = function(array, value, callback) {
+    if (array.indexOf(value) == -1) {
+	var err = 'Value must be one of ' + array.toString();
+	callback(err);
+    }
 };
 
 exports.blank = function(value) {
-	if (value === '') {
-		return null;
-	} else {
-		return value;
-	}
+    if (value === '') {
+	return null;
+    } else {
+	return value;
+    }
 };
 
 exports.getIntValue = function(value, rl) {
-	if (!value || value === null) {
-		rl.close();
-		console.log('Null Value');
-		process.exit(INVALID_ARG);
+    if (!value || value === null) {
+	rl.close();
+	console.log('Null Value');
+	process.exit(INVALID_ARG);
+    } else {
+	var num = parseInt(value);
+
+	if (isNaN(num)) {
+	    rl.close();
+	    console.log('Value \'' + value + '\' is not a Number');
+	    process.exit(INVALID_ARG);
 	} else {
-		var num = parseInt(value);
-
-		if (isNaN(num)) {
-			rl.close();
-			console.log('Value \'' + value + '\' is not a Number');
-			process.exit(INVALID_ARG);
-		} else {
-			return num;
-		}
+	    return num;
 	}
+    }
 };
 
-exports.createTables = function() {
-	// processed files table spec
-	var partitionKey = 'partitionKey';
-	var compressStreamSpec = {
-		AttributeDefinitions : [ {
-			AttributeName : partitionKey,
-			AttributeType : 'S'
-		} ],
-		KeySchema : [ {
-			AttributeName : partitionKey,
-			KeyType : 'HASH'
-		} ],
-		TableName : tableName,
-		ProvisionedThroughput : {
-			ReadCapacityUnits : readIOPS,
-			WriteCapacityUnits : writeIOPS
-		}
-	};
+qs = [ q_region, q_streamName, q_archiveMode, q_setTTL, q_readIOPS, q_writeIOPS ];
 
-	console.log("Creating Table " + tableName + " in Dynamo DB");
-	dynamoDB.createTable(compressStreamSpec, function(err, data) {
-		if (err) {
-			if (err.code !== 'ResourceInUseException') {
-				console.log(Object.prototype.toString.call(err).toString());
-				console.log(err.toString());
-				process.exit(ERROR);
-			}
-		}
-	});
-};
-
-qs.push(q_region);
-qs.push(q_tableName);
-qs.push(q_readIOPS);
-qs.push(q_writeIOPS);
-
-// always have to have the 'last' function added to halt the readline channel
-// and run the setup
-qs.push(last);
-
-// call the first function in the function list, to invoke the callback
-// reference chain
-async.waterfall(qs);
+async.waterfall(qs, last);
