@@ -1,4 +1,4 @@
-var debug = true;
+var debug = process.env['DEBUG'] || false;
 require("./lib/constants");
 
 exports.handler = function(event, context) {
@@ -38,7 +38,7 @@ exports.handler = function(event, context) {
     var current_region = process.env[REGION_KEY];
 
     // setup the stream archiver if it hasn't yet been initialised
-    var compressor = require('./lib/kinesis-archiver')(current_region);
+    var archiver = require('./lib/kinesis-archiver')(current_region);
 
     if (noProcessReason) {
 	// fail processing with the specified reason
@@ -49,7 +49,7 @@ exports.handler = function(event, context) {
 	var streamName = eventSourceARNTokens[eventSourceARNTokens.length - 1].split("/")[1];
 
 	// setup the compressor
-	compressor.init(streamName, undefined, function(err) {
+	archiver.init(streamName, undefined, function(err) {
 	    if (err) {
 		finish(err);
 	    } else {
