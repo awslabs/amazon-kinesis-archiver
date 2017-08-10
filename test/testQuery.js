@@ -34,7 +34,23 @@ var by_range = function(callback) {
     });
 };
 
-async.waterfall([ by_item, by_range ], function(err) {
+var all_for_key = function(callback) {
+    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', undefined, undefined, undefined,
+	    function(err, item) {
+		console.log("Data for All Received");
+		if (err) {
+		    console.log(err);
+		} else {
+		    console.log(JSON.stringify(item));
+		}
+	    }, function(err) {
+		console.log("Data for All Complete");
+		console.log(err);
+		callback(err);
+	    });
+};
+
+async.waterfall([ by_item, by_range, all_for_key ], function(err) {
     console.log("tests complete");
     process.exit(0);
 });
