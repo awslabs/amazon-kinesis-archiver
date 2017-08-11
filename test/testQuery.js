@@ -5,52 +5,78 @@ var sqn1 = '49550822123942288925422195661802908599218112602138741410';
 var sqn2 = '49550822123942288925422195661802908599218112602138741412';
 
 var by_item = function(callback) {
-    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', sqn1, sqn1, undefined, function(err, item) {
-	console.log("Data by Item Received");
-	if (err) {
-	    console.log(err);
-	} else {
-	    console.log(JSON.stringify(item));
-	}
-    }, function(err) {
+    var drained = false;
+    var worker = function(task, wCallback) {
+	console.log(task);
+	wCallback();
+    };
+    var queue = async.queue(worker, 2);
+    queue.drain = function() {
+	drained = true;
+    }
+
+    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', sqn1, sqn1, undefined, queue, function(err) {
 	console.log("Query by Item Complete");
-	if (err) {
-	    console.log(err);
-	}
-	callback(err);
+	async.until(function() {
+	    return drained;
+	}, function(untilCallback) {
+	    setTimeout(function() {
+		untilCallback();
+	    }, 500);
+	}, function(err) {
+	    callback(err);
+	});
     });
 };
 
 var by_range = function(callback) {
-    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', sqn1, sqn2, 10, function(err, item) {
-	console.log("Data by Range Received");
-	if (err) {
-	    console.log(err);
-	} else {
-	    console.log(JSON.stringify(item));
-	}
-    }, function(err) {
+    var drained = false;
+    var worker = function(task, wCallback) {
+	console.log(task);
+	wCallback();
+    };
+    var queue = async.queue(worker, 2);
+    queue.drain = function() {
+	drained = true;
+    }
+
+    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', sqn1, sqn2, 10, queue, function(err) {
 	console.log("Query by Range Complete");
-	if (err) {
-	    console.log(err);
-	}
-	callback(err);
+	async.until(function() {
+	    return drained;
+	}, function(untilCallback) {
+	    setTimeout(function() {
+		untilCallback();
+	    }, 500);
+	}, function(err) {
+	    callback(err);
+	});
     });
 };
 
 var all_for_key = function(callback) {
-    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', undefined, undefined, undefined,
-	    function(err, item) {
-		console.log("Data for All Received");
-		if (err) {
-		    console.log(err);
-		} else {
-		    console.log(JSON.stringify(item));
-		}
-	    }, function(err) {
+    var drained = false;
+    var worker = function(task, wCallback) {
+	console.log(task);
+	wCallback();
+    };
+    var queue = async.queue(worker, 2);
+    queue.drain = function() {
+	drained = true;
+    }
+
+    q.queryArchive('EnergyPipelineSensors', '3388323060863249599', undefined, undefined, undefined, queue,
+	    function(err) {
 		console.log("Data for All Complete");
-		console.log(err);
-		callback(err);
+		async.until(function() {
+		    return drained;
+		}, function(untilCallback) {
+		    setTimeout(function() {
+			untilCallback();
+		    }, 500);
+		}, function(err) {
+		    callback(err);
+		});
 	    });
 };
 
