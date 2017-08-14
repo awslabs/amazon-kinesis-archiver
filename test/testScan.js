@@ -82,7 +82,11 @@ var by_approx = function(callback) {
     });
 };
 
-async.waterfall([ everything, by_seq, by_approx ], function(err) {
+var console_support = function(callback) {
+    q.scanToStdConsole('EnergyPipelineSensors', sqn1, undefined, undefined, 10, callback);
+};
+
+async.waterfall([ /*everything, by_seq, by_approx,*/ console_support ], function(err) {
     console.log("tests complete");
     process.exit(0);
 });
