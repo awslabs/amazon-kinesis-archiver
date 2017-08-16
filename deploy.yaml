@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  StreamArn:
+    Default: arn:aws:kinesis:eu-west-1:999999999999:stream/MyStream
+    Description: ARN of the Kinesis Stream to Archive
+    Type: String
+    AllowedPattern: arn:aws:kinesis:[A-Za-z-0-9]+:\d+:stream\/[A-Za-z0-9]+
+  StreamPosition:
+    Default: TRIM_HORIZON
+    Description: The point in the Stream to start archiving messages
+    Type: String
+    AllowedValues:
+      - TRIM_HORIZON
+      - LATEST
+Resources:
+  StreamProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs6.10
+      CodeUri:         
+        Bucket: !Sub awslabs-code-${AWS::Region}
+        Key: AmazonKinesisArchiver/amazon-kinesis-archiver-1.0.0.zip
+      MemorySize: 192
+      Timeout: 60
+      Tags:
+        Name: AmazonKinesisArchiver
+      Role: !GetAtt ArchiverIAMRole.Arn
+      Events:
+        Stream:
+          Type: Kinesis
+          Properties:
+            Stream: !Ref StreamArn
+            StartingPosition: !Ref StreamPosition                
+  ArchiverIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+        Path: "/"
+        ManagedPolicyArns:
+            - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AllowLambdaServiceToAssumeRole"
+              Effect: "Allow"
+              Action:
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+        Policies:
+          -
+            PolicyName: "KinesisArchiverPermission"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                -
+                  Effect: "Allow"
+                  Action:
+                    - "kinesis:DescribeStream"
+                    - "kinesis:ListStreams"
+                    - "kinesis:GetShardIterator"
+                    - "kinesis:GetRecords"
+                    - "kinesis:PutRecord"
+                    - "kinesis:PutRecords"
+                    - "dynamoDB:PutItem"
+                    - "dynamoDB:UpdateItem"
+                    - "dynamoDB:Query"
+                    - "dynamoDB:Scan"
+                  Resource: "*"
