@@ -17,8 +17,17 @@
 # limitations under the License.
 
 function usage {
-	echo "Please provide the Stream Name, the Archival Mode (all | latest), and the Region. You can also specify an attribute name to be used for Archival TTL and the TTL Seconds. If provided, then both are required."
+	echo "Please provide the Stream Name, the Archive Mode (all | latest), and the Region. You can also specify the TTL Interval in Seconds if data should automatically be deleted from DynamoDB."
 	exit -1
+}
+
+function checkDep {
+	which $1 > /dev/null 2>&1
+	
+	if [ $? != 0 ]; then
+		echo "This utility requires the AWS Cli, which can be installed using instructions found at http://docs.aws.amazon.com/cli/latest/userguide/installing.html, as well as a node.js runtime"
+		exit -2
+	fi
 }
 
 if [ $# -lt 3 ]; then
@@ -31,22 +40,20 @@ if [ $# -lt 3 ]; then
 	fi
 fi
 
-which aws > /dev/null 2>&1
-
-if [ $? != 0 ]; then
-	echo "This utility requires the AWS Cli, which can be installed using instructions found at http://docs.aws.amazon.com/cli/latest/userguide/installing.html"
-	exit -2
-fi
+checkDep aws
+checkDep node
 
 if [[ $2 = "all" || $2 = "latest" ]]; then
 	aws kinesis add-tags-to-stream --stream-name $1 --tags StreamArchiveMode=$2 --region $3
 	
-	if [[ "$4" != "" ]]; then
-		archive=attributeName=$4:expireSeconds=$5
-		aws kinesis add-tags-to-stream --stream-name $1 --tags ArchiveTTL=$archive --region $3
+	if [[ "$4" != "" ]]; then		
+		aws kinesis add-tags-to-stream --stream-name $1 --tags ArchiveTTL=expireSeconds=$4 --region $3
 	fi
 	
 	aws kinesis list-tags-for-stream --stream-name $1 --region $3
 else
 	usage
 fi
+
+# now go create the dynamo db table
+node createDynamoTable.js
