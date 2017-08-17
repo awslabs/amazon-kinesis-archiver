@@ -44,6 +44,7 @@ checkDep aws
 checkDep node
 
 if [[ $2 = "all" || $2 = "latest" ]]; then
+	echo "Adding configuration tags to Kinesis Stream $1"
 	aws kinesis add-tags-to-stream --stream-name $1 --tags StreamArchiveMode=$2 --region $3
 	
 	if [[ "$4" != "" ]]; then		
@@ -56,4 +57,4 @@ else
 fi
 
 # now go create the dynamo db table
-node createDynamoTable.js
+node createDynamoTable.js $1 $3 $2
