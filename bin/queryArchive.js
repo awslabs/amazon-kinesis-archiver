@@ -11,7 +11,7 @@ var getArgSafe = function(index) {
 
 var failArgSafe = function(index, label) {
     var v = getArgSafe(index);
-    if (!v) {
+    if (!v && v !== "") {
 	console.error("You must provide a value for " + label);
 	process.exit(ERROR);
     } else {
