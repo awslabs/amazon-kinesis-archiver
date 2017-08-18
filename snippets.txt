@@ -1,0 +1,5 @@
+// publish deploy.yaml to regional buckets
+for r in `aws ec2 describe-regions --query Regions[*].RegionName --output text`; do aws s3 cp deploy.yaml s3://awslabs-code-$r/AmazonKinesisArchiver/deploy.yaml --acl public-read --region $r; done
+
+// publish lambda jar to regional buckets
+for r in `aws ec2 describe-regions --query Regions[*].RegionName --output text`; do aws s3 cp dist/amazon-kinesis-archiver-1.0.0.zip s3://awslabs-code-$r/AmazonKinesisArchiver/amazon-kinesis-archiver-1.0.0.zip --acl public-read --region $r; done

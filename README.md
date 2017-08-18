@@ -42,13 +42,13 @@ Once done, you will see that you have a new Lambda function deployed, with name 
 
 Now that the funciton is set up, we need to tell it how data should be archived. Unfortunately we can't yet do this through AWS SAM, so we'll use the `tagStream.sh` script. The Kinesis Archiver knows how to archive data based on Tags that are placed on the source stream, which enables a single function to archive a virtually unlimited number of Kinesis Streams. To set the archive mode, simply run:
 
-`./setup <Stream Name> <Archive Mode> <region>` with the following options:
+`./bin/setup <Stream Name> <Archive Mode> <region>` with the following options:
 
 * Stream Name - the Name of the Kinesis Stream in the specified Region. Please note this is not the Stream ARN used previously
 * Archive Mode - one of `ALL` or `LATEST`. Archive Mode `ALL` will create a full record of all messages from the Stream. `LATEST` will only keep the last copy of a message on the basis of the supplied Stream Partition Key value
 * Region - the region where the Kinesis Stream is deployed
 
-Once done, you will be asked a series of questions about how the Archive should be stored in DynamoDB.
+Once done, you will be asked a series of questions about how the Archive should be stored in DynamoDB, including whether you want TTL expiration of archive data, and how many read and write IOPS to provision for the archive table.
 
 _Please note that this script requires that you have the [AWS Command Line Interface](https://aws.amazon.com/cli), and a node.js runtime installed on your system_.
 
@@ -68,37 +68,28 @@ This table has the following structure:
 
 ## Automatically expiring data
 
-The Kinesis Archiver has the ability to automatically remove data from the Stream Archive using the [DynamoDB Time To Live (TTL)](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html) feature. When used, it will automatically delete data from DynamoDB based on attribute:
+The Kinesis Archiver has the ability to automatically remove data from the Stream Archive using the [DynamoDB Time To Live (TTL)](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html) feature. When used, it will automatically delete data from DynamoDB based on table attribute:
 
 * `expireAfter` - Long - the timestamp expressed as epoch seconds after which the entry in DynamoDB may be expired by the TTL management process
 
-To take advantage of the TTL feature, you can supply two additional parameters to the `tagStream.sh` command line script:
+When the value is found in the Stream configuration, the Archiver will automatically add the `expireAfter` attribute set to the `expireSeconds` after the archival time.
 
-* 
+_If you were to change your mind and no longer want TTL applied, you can delete the `expireAfter` attribute from every item in the table_
 
 ## Querying data from an archive
 
+You may want to query data that is stored in the archive
+
 ## Replaying records from an archive
 
+## Support
 
-## How would I use this data once it's been captured?
+Please note that the Amazon Kinesis Archiver is a community maintained AWSLabs project, and is not supported directly by Amazon Web Services Support. If you have any problems, questions, or feature requests, please raise an issue here on Github.
 
-In order to use the data stored in DynamoDB, you would run a [SCAN operation] (http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html) against the table called ```MyKinesisStream-compressed```, and for each Item returned you would decode the ```recordData``` attribute which is stored as a String.
+----
 
-## Setup
+Amazon Kinesis Archiver
 
-In order to use this Lambda function, you must pre-create the Dynamo DB Table used to store the Stream Archive. To do this, run:
+Copyright 2017-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-```
-node createDynamoTable
-```
-
-which will prompt for AWS Region, Stream Name, and the required read and write IOPS. You should set the Write IOPS to Kinesis Open Shard Count * 1000 to ensure that the Stream compressor doesn't fall behind the 'head' of the Stream.
-
-## Deploying
-
-To deploy this functionality to AWS Lambda, create a new Lambda function using the [KinesisStreamCompressor-1.0.0.zip](dist/KinesisStreamCompressor-1.0.0.zip). Then, create a new Event Source Mapping for your function that references the desired Kinesis Stream to be archived. Please keep in mind that a single Lambda deployment can handle processing multiple Kinesis Streams, so you can create multiple event sources for a single function.
-
-## Testing
-
-You can test the module with ```test.js``` which allows you type in a dummy Kinesis Record Set and then allows running with ```node test```. 
+Amazon Software License: https://aws.amazon.com/asl
