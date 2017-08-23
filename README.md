@@ -42,7 +42,7 @@ Once done, you will see that you have a new Lambda function deployed, with name 
 
 Now that the funciton is set up, we need to tell it how data should be archived. Unfortunately we can't yet do this through AWS SAM, so we'll use the `tagStream.sh` script. The Kinesis Archiver knows how to archive data based on Tags that are placed on the source stream, which enables a single function to archive a virtually unlimited number of Kinesis Streams. To set the archive mode, simply run:
 
-`./bin/setup <Stream Name> <Archive Mode> <region>` with the following options:
+`./bin/setup.sh <Stream Name> <Archive Mode> <region>` with the following options:
 
 * Stream Name - the Name of the Kinesis Stream in the specified Region. Please note this is not the Stream ARN used previously
 * Archive Mode - one of `ALL` or `LATEST`. Archive Mode `ALL` will create a full record of all messages from the Stream. `LATEST` will only keep the last copy of a message on the basis of the supplied Stream Partition Key value
@@ -54,7 +54,7 @@ _Please note that this script requires that you have the [AWS Command Line Inter
 
 ## What happens now?
 
-The DynamoDB table is called ```MyKinesisStream-archive-<MODE>```, where `<MODE>` is one of `ALL` or `LATEST`.
+Data from your Kinesis Stream will be routed to the Archiver Lambda function, and then saved into DynamoDB. The DynamoDB table is called ```MyKinesisStream-archive-<MODE>```, where `<MODE>` is one of `ALL` or `LATEST`.
 
 This table has the following structure:
 
@@ -65,10 +65,12 @@ This table has the following structure:
 * `approximateArrivalTimestamp` - Long - Timestamp expressed as epoch seconds when the message was recieved by Amazon Kinesis
 * `shardId` - String - the Shard ID from which the message was received
 
+If you specify that the archive mode is `ALL`, then the table has a Partition/Sort key of `partitionKey/sequenceNumber`. If you instead specify `LATEST`, then the table will just have Partition key of `partitionKey`, and only the latest `sequenceNumber` will be stored (using a [DynamoDB Conditional Write](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html#WorkingWithItems.ConditionalUpdate)).
+
 
 ## Automatically expiring data
 
-The Kinesis Archiver has the ability to automatically remove data from the Stream Archive using the [DynamoDB Time To Live (TTL)](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html) feature. When used, it will automatically delete data from DynamoDB based on table attribute:
+The Kinesis Archiver has the ability to automatically remove data from the Stream Archive using the [DynamoDB Time To Live (TTL)](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html) feature, and is probably a good idea to use if you select archive mode `ALL`. When used, it will automatically delete data from DynamoDB based on table attribute:
 
 * `expireAfter` - Long - the timestamp expressed as epoch seconds after which the entry in DynamoDB may be expired by the TTL management process
 
@@ -134,7 +136,7 @@ In this processing model, you need to follow the workflow:
 
 1. Create an async queue worker, who handles the records received from the archive table. This worker has the signature `function(record, callback)` which is supplied a record from the given API, and then should call the provided callback when processing is completed. Records will only be removed from the async queue once all callbacks have completed
 2. Create a marker variable which indicates whether the given API has completed supplying data
-3. Create a queue drain() function, which is called whenever the queue is emptied. This could be called multiple times during the lifecycle of the queue, given that all queued callbacks could complete but the query method is still running. In this queue drain method, unless the above marker variable has been modified by the API callback, the method is still running.
+3. Create a `queue drain()` function, which is called whenever the queue is emptied. This could be called multiple times during the lifecycle of the queue, given that all queued callbacks could complete but the query method is still running. In this queue drain method, unless the above marker variable has been modified by the API callback, the method is still running.
 4. Call the API, and supply the configured queue method. This API must supply a callback which is invoked when the API has completed. It is recommended that this callback set the value of the variable declared in `2` which can then be monitored by the queue drain function.
 
 The integration model for working with these API's can be seen in the example method which services the console API's, such as `queryToCustomConsole`:
@@ -193,7 +195,7 @@ For message reinjection, the API provides a queue worker which add the required 
 getReinjectWorker = function (sourceStreamName, targetStreamName, includeReinjectMetadata, metadataSeparator, kinesisClient)
 ```
 
-This interface allows you to create query or scan based access methods for the Archive table, and use the worker to reinject data easily.
+This interface allows you to create query or scan based access methods for the Archive table, and use the worker to reinject data easily.f
 
 ## Support
 
