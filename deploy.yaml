@@ -61,6 +61,7 @@ Resources:
                   Action:
                     - "kinesis:DescribeStream"
                     - "kinesis:ListStreams"
+                    - "kinesis:ListTagsForStream"
                     - "kinesis:GetShardIterator"
                     - "kinesis:GetRecords"
                     - "kinesis:PutRecord"
