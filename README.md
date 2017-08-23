@@ -2,9 +2,9 @@
 
 Amazon Kinesis provides a family of services for working with streaming data at any scale. Kinesis Streams enables you to build custom applications that process or analyze streaming data for specialized needs. By default, Records of a Stream are accessible for up to 24 hours from the time they are added to the Stream. You can raise this limit to up to 7 days by enabling extended data retention.
 
-Some customers have the need to be able to reprocess data that is significantly older than the Stream retention period, and have asked us for a way to archive data, and to provide the ability to 'replay' data into the stream for subsequent processing. Customers have also said that they want the ability to use Kinesis Streams for a 'unified log' or 'log oriented' architecture. In this model, customers may use a stream to build a 'database' of changes carried by the stream, and would like to be able to efficiently consume the sum total or final copies of log messages quickly and easily.
+Some applications have the need to be able to reprocess data that is significantly older than the Stream retention period, and have the need to archive data, and to provide the ability to 'replay' data into the stream for subsequent processing. This type of feature allows you to use Kinesis Streams for a 'unified log' or 'log oriented' architecture. In this model, you can use a stream to build a database of changes carried on the stream, and consume the sum total or final copies of log messages quickly and easily.
 
-This module, built in AWS Lambda, gives you the ability to accomplish many of the above requirements, without having to run additional server infrastructure. It consumes data from an Amazon Kinesis Stream, and writes event records to Amazon DynamoDB. When it does this, you can choose whether it keeps all data received, or only the latest record by sequence number for the record Partition Key. You can then use programmatic API's in your software to query or replay data into the original or alternative Kinesis Streams.
+This community built and maintained module, built in AWS Lambda, gives you the ability to accomplish many of the above requirements, without having to run additional server infrastructure. It consumes data from an Amazon Kinesis Stream, and writes event records to Amazon DynamoDB. When it does this, you can choose whether it keeps all data received, or only the latest record by sequence number for the record Partition Key. You can then use programmatic API's in your software to query or replay data into the original or alternative Kinesis Streams.
 
 ![AmazonKinesisArchiver](AmazonKinesisArchiver.png)
 
@@ -54,7 +54,7 @@ _Please note that this script requires that you have the [AWS Command Line Inter
 
 ## What happens now?
 
-The The DynamoDB table is called ```MyKinesisStream-archive-<MODE>```, where `<MODE>` is one of `ALL` or `LATEST`.
+The DynamoDB table is called ```MyKinesisStream-archive-<MODE>```, where `<MODE>` is one of `ALL` or `LATEST`.
 
 This table has the following structure:
 
@@ -78,9 +78,122 @@ _If you were to change your mind and no longer want TTL applied, you can delete 
 
 ## Querying data from an archive
 
-You may want to query data that is stored in the archive
+You may want to query data that is stored in the archive, which is easy to do from the command line, or programmatically. To access data using simple console tools, you can just run the `bin/queryArchive.js` function, using the following arguments:
+
+```javascript
+node queryArchive.js <region> <streamName> <partitionKey> <sequenceNumber> <sequenceNumber> <recordLimit>
+```
+
+With the provided arguments:
+
+* region - The AWS Region where the Archive table is stored
+* streamName - The name of the Kinesis Stream being archived
+* partitionKey - The unique partition key value to be queried
+* sequenceNumber (start | end) - The sequence number to extract, or if both sequence number values are provided, the lower sequence number to look for. You can provide an empty string "" to indicate no value. Providing a sequence value for one argument and an empty string for the other will result in a range query being executed
+* recordLimit - This will only query the specified number of records from the table
+
+In some cases, you may not know the partition key you are looking for, or may want to issue a more general query. In this case, you'll want to use the `bin/scanArchive.js` script, which is invoked by:
+
+```javascript
+node scanArchive.js <region> <stream name> <sequenceStart> <lastUpdateDateStart> <approximateArrivalStart> <recordLimit>
+```
+
+With the provided arguments:
+
+* region - The AWS Region where the Archive table is stored
+* streamName - The name of the Kinesis Stream being archived
+* sequenceStart - The starting sequence number to read records from
+* lastUpdateStart - The starting date that the record was archived into the archive table
+* approximateArrivalStart - The starting date based upon the timestamp assigned by Amazon Kinesis when the original record was received
+* recordLimit - This will only query the specified number of records from the table
 
 ## Replaying records from an archive
+
+The above query and scan API's are used to give you flexibility on how you replay data back into a Stream. When you push data back into a Stream, it is definitely best practice to consider how your applications will know that the data is not original data, and to deal with it as a 'replay' of previously seen data. To facilitate this requirement, the reinjection model used by this API allows you to request the original message data be reinjected with the original message, which then gives you a contract in your processors that can be used to determine if a message is the correct format and if it is being replayed. When requested, the reinject API's will add the following data to payload before sending the data to the specified Kinesis Stream:
+
+```javascript
+{
+    "originalApproximateArrivalTimestamp": <approximateArrivalTimestamp>,
+    "originalShardId": <shardId>,
+    "originalSequenceNumber": <sequenceNumber>,
+    "originalStreamName": <streamName> (only added if you are routing to a different stream)
+}
+```
+
+When using the reinject methods, you must supply a boolean value indicating whether this metadata should be added to replayed messages, and also a 'metadata separator' which is a character you supply to dilineate the message metadata from the original message contents. Data stored in the archive is Base64 encoded, but reinjection will decode the data prior to creating the message to be reinjected. For example, if you called a reinject method with `method(true,'|')` and the original data in Kinesis was `HelloWorld`, you would get a value on the target Stream of `<originalMetadata>|HelloWorld`. Base64 encoding is reapplied by the Kinesis putRecord API.
+
+## API Access
+
+The above methods are simplistic interfaces to view data from stdout in a console. For most typical use cases, you will integrate with the query, scan and reinject methods using a programatic interface. All the base interfaces for the API are provided in the `lib/archive-access.js` module, and generally take the same arguments as listed above. However, there is one major difference to consider. Because the query and scan operations in node.js are asyncronous API's this module uses the node.js module [async](https://caolan.github.io/async) to provide data for processing, and a callback method to indicate that all records have been provided by the API. As such, each API takes an argument which is an [async.queue](https://caolan.github.io/async/docs.html#queue) which can be configured to meet your application's requirements around concurrency and processing speed. 
+
+```javascript
+queryArchive = function(streamName, partitionKey, sequenceStart, sequenceEnd, recordLimit, recordQueue, callback)
+```
+
+In this processing model, you need to follow the workflow:
+
+1. Create an async queue worker, who handles the records received from the archive table. This worker has the signature `function(record, callback)` which is supplied a record from the given API, and then should call the provided callback when processing is completed. Records will only be removed from the async queue once all callbacks have completed
+2. Create a marker variable which indicates whether the given API has completed supplying data
+3. Create a queue drain() function, which is called whenever the queue is emptied. This could be called multiple times during the lifecycle of the queue, given that all queued callbacks could complete but the query method is still running. In this queue drain method, unless the above marker variable has been modified by the API callback, the method is still running.
+4. Call the API, and supply the configured queue method. This API must supply a callback which is invoked when the API has completed. It is recommended that this callback set the value of the variable declared in `2` which can then be monitored by the queue drain function.
+
+The integration model for working with these API's can be seen in the example method which services the console API's, such as `queryToCustomConsole`:
+
+```javascript
+    queryToCustomConsole = function (streamName, partitionKey, sequenceStart, sequenceEnd, recordLimit, threads,
+                                     customConsole, callback) {
+        // create a worker method that will be used for the queue callback
+        var worker = function (record, wCallback) {
+            // decode the data stored in the table
+            var data = new Buffer(record.recordData.S, 'Base64').toString(intermediateEncoding);
+            // write to the supplied console
+            customConsole.log(data);
+            wCallback();
+        };
+        // create the async queue with the requested number of threads
+        var queue = async.queue(worker, threads);
+
+        // create a marker variable to indicate whether the query API has supplied all records into the provided queue
+        var queryCompleted = false;
+        var queryErrors;
+
+        /* create a queue drain method which is signalled every time the queue is emptied. This method will check the
+            status of the query completed variable, and only calls the provided callback after 500 milliseconds, which
+            will allow the queue to refill with async records if there is a delay in processing */
+        queue.drain = function () {
+            async.until(function () {
+                // we're only done when the queryArchive api calls the final callback. This callback sets the queryCompleted flag to true
+                return queryCompleted;
+            }, function (untilCallback) {
+                // call the provided callback after 500 millis to ensure we allow the queue to refill in case of a race
+                setTimeout(function () {
+                    untilCallback();
+                }, 500);
+            }, function (err) {
+                callback(err || queryErrors);
+            });
+        };
+
+        // query the stored archive using the supplied filters
+        queryArchive(streamName, partitionKey, sequenceStart, sequenceEnd, recordLimit, queue, function (err) {
+            /* once this method has been called, the queryArchive API has completed sending records to the provided
+               queue. However, this does not mean that the query workers have finished doing their job with the provided
+               records */
+            queryErrors = err;
+            queryCompleted = true;
+        });
+    }
+```
+
+We hope that the comments in the code are enough information to allow you to create robust applications that work with the asyncronous nature of the API.
+
+For message reinjection, the API provides a queue worker which add the required metadata to the original archived message, and then put the records into the Kinesis Stream using a supplied Kinesis API Client. It's interface is:
+
+```javascript
+getReinjectWorker = function (sourceStreamName, targetStreamName, includeReinjectMetadata, metadataSeparator, kinesisClient)
+```
+
+This interface allows you to create query or scan based access methods for the Archive table, and use the worker to reinject data easily.
 
 ## Support
 
