@@ -1,10 +1,10 @@
 # Kinesis Stream Archiver
 
-Amazon Kinesis provides a family of services for working with streaming data at any scale. Kinesis Streams enables you to build custom applications that process or analyse streaming data for specialised needs. By default, Records of a Stream are accessible for up to 24 hours from the time they are added to the Stream. You can raise this limit to up to 7 days by enabling extended data retention.
+Amazon Kinesis provides a family of services for working with streaming data at any scale. Kinesis Streams enables you to build custom applications that process or analyse streaming data for specialised needs. By default, Records of a Stream are accessible for up to 24 hours from the time they are added to the Stream. You can raise this limit to up to 7 days by enabling extended data retention, and you can also [send your Kinesis Streams data to Kinesis Firehose](http://docs.aws.amazon.com/firehose/latest/dev/create-name.html) for long term backup on Amazon S3.
 
-Some applications have the need to be able to reprocess data that is significantly older than the Stream retention period, and have the need to archive data, and to provide the ability to 'replay' data into the stream for subsequent processing. This type of feature allows you to use Kinesis Streams for a 'unified log' or 'log oriented' architecture. In this model, you can use a stream to build a database of changes carried on the stream, and consume the sum total or final copies of log messages quickly and easily.
+Some applications have the need to be able to reprocess data that is significantly older than the Stream retention period, and would like to be able to 'replay' data into a Stream for subsequent processing. This type of feature allows you to use Kinesis Streams for a 'unified log' or 'log oriented' architecture. In this model, you can use a Stream to build a database of changes carried on the Stream, and consume the sum total or final copies of log messages quickly and easily.
 
-This community built and maintained module, built in AWS Lambda, gives you the ability to accomplish many of the above requirements, without having to run additional server infrastructure. It consumes data from an Amazon Kinesis Stream, and writes event records to Amazon DynamoDB. When it does this, you can choose whether it keeps all data received, or only the latest record by sequence number for the record Partition Key. You can then use programmatic API's in your software to query or replay data into the original or alternative Kinesis Streams.
+This community built and maintained module, built in AWS Lambda, gives you the ability to accomplish many of the above requirements without having to run additional server infrastructure. It consumes data from an Amazon Kinesis Stream and writes the event records to Amazon DynamoDB, a fully managed and highly durable NOSQL database. When it does this, you can choose whether it keeps all data received, or only the latest record by sequence number for the Stream's Partition Key. You can then use programmatic API's in your software to query or replay data into the original or alternative Kinesis Streams.
 
 ![AmazonKinesisArchiver](AmazonKinesisArchiver.png)
 
@@ -40,7 +40,7 @@ Once done, you will see that you have a new Lambda function deployed, with name 
 
 ## Configuring the Archive Mode
 
-Now that the function is set up, we need to tell it how data should be archived. Unfortunately we can't yet do this through AWS SAM, so we'll use the `tagStream.sh` script. The Kinesis Archiver knows how to archive data based on Tags that are placed on the source stream, which enables a single function to archive a virtually unlimited number of Kinesis Streams. To set the archive mode, simply run:
+Now that the function is set up, we need to tell it how data should be archived for each Stream. Unfortunately we can't yet do this through AWS SAM, so we'll use a script that's part of this project. The Kinesis Archiver knows decides how to archive data based on Tags that are placed on the source Kinesis Stream, which enables a single function to archive a virtually unlimited number of input Streams. To set the archive mode, simply run:
 
 `./bin/setup.sh <Stream Name> <Archive Mode> <region>` with the following options:
 
@@ -109,7 +109,7 @@ With the provided arguments:
 * approximateArrivalStart - The starting date based upon the timestamp assigned by Amazon Kinesis when the original record was received
 * recordLimit - This will only query the specified number of records from the table
 
-## Replaying records from an archive
+## Reprocessing records from an archive
 
 The above query and scan API's are used to give you flexibility on how you replay data back into a Stream. When you push data back into a Stream, it is definitely best practice to consider how your applications will know that the data is not original data, and to deal with it as a 'replay' of previously seen data. To facilitate this requirement, the reinjection model used by this API allows you to request the original message data be reinjected with the original message, which then gives you a contract in your processors that can be used to determine if a message is the correct format and if it is being replayed. When requested, the reinject API's will add the following data to payload before sending the data to the specified Kinesis Stream:
 
@@ -122,7 +122,28 @@ The above query and scan API's are used to give you flexibility on how you repla
 }
 ```
 
-When using the reinject methods, you must supply a boolean value indicating whether this metadata should be added to replayed messages, and also a 'metadata separator' which is a character you supply to delineate the message metadata from the original message contents. Data stored in the archive is Base64 encoded, but reinjection will decode the data prior to creating the message to be reinjected. For example, if you called a reinject method with `method(true,'|')` and the original data in Kinesis was `HelloWorld`, you would get a value on the target Stream of `<originalMetadata>|HelloWorld`. Base64 encoding is reapplied by the Kinesis putRecord API.
+When using the reinject API's, you must supply a boolean value indicating whether this metadata should be added to replayed messages, and also a 'metadata separator' which is a character you supply to delineate the message metadata from the original message contents. Data stored in the archive is Base64 encoded, but reinjection will decode the data prior to creating the message to be reinjected. For example, if you called a reinject method with `method(true,'|')` and the original data in Kinesis was `HelloWorld`, you would get a value on the target Stream of `|<originalMetadata>|HelloWorld`. The metadata separator is also placed at the beginning of the message, so that serialisers within your application can 'peek' at the first byte (given you use a single byte separator!) and decide on the type of message received:
+
+```javascript
+var mysep = "|";
+
+var metadata;
+var messagePayload;
+
+// check if the first character of the record matches the separator
+if (myKinesisRecord.charAt(0) === mysep) {
+	// split the record on the separator
+	var elements = data.split(mysep);
+	// the first field is empty due to the separator prefix
+	metadata = JSON.parse(elements[1]);
+	messagePayload = elements[2];
+} else {
+	// message doesn't have the separator character as the first value, so we'll assume it's an original message
+	messagePayload = data;
+}
+```
+
+It is for this reason that should choose a separator character that is single byte, and is not allowed to be placed at the beginning of your message on the Stream (for instance, an unprintable character etc).
 
 ## API Access
 
@@ -189,13 +210,44 @@ The integration model for working with these API's can be seen in the example me
 
 We hope that the comments in the code are enough information to allow you to create robust applications that work with the asynchronous nature of the API.
 
+## Performing message replay
+
 For message reinjection, the API provides a queue worker which add the required metadata to the original archived message, and then put the records into the Kinesis Stream using a supplied Kinesis API Client. It's interface is:
 
 ```javascript
 getReinjectWorker = function (sourceStreamName, targetStreamName, includeReinjectMetadata, metadataSeparator, kinesisClient)
 ```
 
-This interface allows you to create query or scan based access methods for the Archive table, and use the worker to reinject data easily.f
+This interface allows you to create query or scan based access methods for the Archive table, and use the worker to reinject data easily. For example, to replay data based on a scan operation, we can use the example method:
+
+```javascript
+    reinjectWithScan = function (sourceStreamName, targetStreamName, sequenceStart, lastUpdateDateStart, approximateArrivalStart, recordLimit, includeReinjectMetadata, metadataSeparator, threads, callback) {
+        var scanErrors;
+        var scanCompleted = false;
+
+        // get a new reinject worker
+        var queue = async.queue(getReinjectWorker(sourceStreamName, targetStreamName, includeReinjectMetadata, metadataSeparator, this.kinesisClient), threads);
+
+        queue.drain = function () {
+            async.until(function () {
+                return scanCompleted;
+            }, function (untilCallback) {
+                setTimeout(function () {
+                    untilCallback();
+                }, 500);
+            }, function (err) {
+                callback(err || scanErrors);
+            });
+        };
+
+        // scan through the stored archive using the supplied filters
+        scanArchive(sourceStreamName, sequenceStart, lastUpdateDateStart, approximateArrivalStart, recordLimit, queue,
+            function (err) {
+                scanErrors = err;
+                scanCompleted = true;
+            });
+    };
+```
 
 ## Support
 
