@@ -5,7 +5,7 @@ Parameters:
     Default: arn:aws:kinesis:eu-west-1:999999999999:stream/MyStream
     Description: ARN of the Kinesis Stream to Archive
     Type: String
-    AllowedPattern: arn:aws:kinesis:[A-Za-z-0-9]+:\d+:stream\/[A-Za-z0-9]+
+    AllowedPattern: arn:aws:kinesis:[A-Za-z-0-9]+:\d+:stream\/[A-Za-z-0-9]+
   StreamPosition:
     Default: TRIM_HORIZON
     Description: The point in the Stream to start archiving messages
