@@ -57,4 +57,4 @@ else
 fi
 
 # now go create the dynamo db table
-node createDynamoTable.js $1 $3 $2
+node bin/createDynamoTable.js $1 $3 $2

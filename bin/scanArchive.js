@@ -25,12 +25,11 @@ if (process.argv.length < 6) {
 	    .error("You must provide the region name, stream name, partition key and sequence number to query the stream archive");
     process.exit(ERROR);
 } else {
-    var regionName = failArgSafe(2, 'region');
-    var streamName = failArgSafe(3, 'streamName');
-    var partitionKey = failArgSafe(4, 'partitionKey');
-    var sequence = failArgSafe(5, 'sequenceNumber');
-
-    var sequenceEnd = getArgSafe(6);
+    var regionName = failArgSafe(2);
+    var streamName = failArgSafe(3);
+    var sequenceStart = failArgSafe(4);
+    var lastUpdateDateStart = getArgSafe(5);
+    var approximateArrivalStart = getArgSafe(6);
     var recordLimit = getArgSafe(7);
 
     var q = require('../lib/archive-access')(regionName);

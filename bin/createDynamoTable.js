@@ -1,4 +1,4 @@
-var tableSetup = require('./lib/tableSetup');
+var tableSetup = require('../lib/tableSetup');
 
 var getArgSafe = function(index) {
     if (process.argv.length >= index + 1) {
