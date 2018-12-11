@@ -33,8 +33,8 @@ When creating the Stack, you must supply a Stream ARN, which is the identity for
 
 |Setting |Start Position |
 | ----|---|
-| TRIM_HORIZON | The system will start archiving from the earliest record available, based on the Stream's retention policy) |
-| LATEST | The system will start archiving from the next record ingested after the Kinesis Event Source is created and the function deployed |
+| `TRIM_HORIZON` | The system will start archiving from the earliest record available, based on the Stream's retention policy) |
+| `LATEST` | The system will start archiving from the next record ingested after the Kinesis Event Source is created and the function deployed |
 
 Once done, you will see that you have a new Lambda function deployed, with name `<Stack Name>-StreamProcessor-<Unique ID>`, and this function will have an Event Source created for the indicated Kinesis Stream.
 
@@ -88,11 +88,11 @@ node queryArchive.js <region> <streamName> <partitionKey> <sequenceNumber> <sequ
 
 With the provided arguments:
 
-* region - The AWS Region where the Archive table is stored
-* streamName - The name of the Kinesis Stream being archived
-* partitionKey - The unique partition key value to be queried
-* sequenceNumber (start | end) - The sequence number to extract, or if both sequence number values are provided, the lower sequence number to look for. You can provide an empty string "" to indicate no value. Providing a sequence value for one argument and an empty string for the other will result in a range query being executed
-* recordLimit - This will only query the specified number of records from the table
+* `region` - The AWS Region where the Archive table is stored
+* `streamName` - The name of the Kinesis Stream being archived
+* `partitionKey` - The unique partition key value to be queried
+* `sequenceNumber` (start | end) - The sequence number to extract, or if both sequence number values are provided, the lower sequence number to look for. You can provide an empty string "" to indicate no value. Providing a sequence value for one argument and an empty string for the other will result in a range query being executed
+* `recordLimit` - This will only query the specified number of records from the table
 
 In some cases, you may not know the partition key you are looking for, or may want to issue a more general query. In this case, you'll want to use the `bin/scanArchive.js` script, which is invoked by:
 
@@ -102,12 +102,12 @@ node scanArchive.js <region> <stream name> <sequenceStart> <lastUpdateDateStart>
 
 With the provided arguments:
 
-* region - The AWS Region where the Archive table is stored
-* streamName - The name of the Kinesis Stream being archived
-* sequenceStart - The starting sequence number to read records from
-* lastUpdateStart - The starting date that the record was archived into the archive table
-* approximateArrivalStart - The starting date based upon the timestamp assigned by Amazon Kinesis when the original record was received
-* recordLimit - This will only query the specified number of records from the table
+* `region` - The AWS Region where the Archive table is stored
+* `streamName` - The name of the Kinesis Stream being archived
+* `sequenceStart` - The starting sequence number to read records from
+* `lastUpdateStart` - The starting date that the record was archived into the archive table
+* `approximateArrivalStart` - The starting date based upon the timestamp assigned by Amazon Kinesis when the original record was received
+* `recordLimit` - This will only query the specified number of records from the table
 
 ## Reprocessing records from an archive
 
