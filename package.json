@@ -1,7 +1,7 @@
 {
 	"name": "kinesis-stream-compressor",
 	"description": "An AWS Lambda function stores only latest unique values of a Kinesis Stream, for the purposes of archive/replay",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"dependencies": 
 	{
 		"async": "2.1.5"
