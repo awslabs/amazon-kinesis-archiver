@@ -44,9 +44,9 @@ Now that the function is set up, we need to tell it how data should be archived 
 
 `./bin/setup.sh <Stream Name> <Archive Mode> <region>` with the following options:
 
-* Stream Name - the Name of the Kinesis Stream in the specified Region. Please note this is not the Stream ARN used previously
-* Archive Mode - one of `ALL` or `LATEST`. Archive Mode `ALL` will create a full record of all messages from the Stream. `LATEST` will only keep the last copy of a message on the basis of the supplied Stream Partition Key value
-* Region - the region where the Kinesis Stream is deployed
+* `Stream Name` - the Name of the Kinesis Stream in the specified Region. Please note this is not the Stream ARN used previously
+* `Archive Mode` - one of `ALL` or `LATEST`. Archive Mode `ALL` will create a full record of all messages from the Stream. `LATEST` will only keep the last copy of a message on the basis of the supplied Stream Partition Key value
+* `Region` - the region where the Kinesis Stream is deployed
 
 Once done, you will be asked a series of questions about how the Archive should be stored in DynamoDB, including whether you want TTL expiration of archive data, and how many read and write IOPS to provision for the archive table.
 
