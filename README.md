@@ -259,4 +259,4 @@ Amazon Kinesis Archiver
 
 Copyright 2017-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Amazon Software License: https://aws.amazon.com/asl
+This library is licensed under the Apache 2.0 License.
