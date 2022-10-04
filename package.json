@@ -1,23 +1,30 @@
 {
 	"name": "kinesis-stream-compressor",
 	"description": "An AWS Lambda function stores only latest unique values of a Kinesis Stream, for the purposes of archive/replay",
-	"version": "1.0.1",
-	"dependencies": 
-	{
-		"async": "2.1.5"
+	"version": "1.0.2",
+	"dependencies": {
+		"async": "2.6.4"
 	},
-
-	"keywords": 
-	["amazon","aws","kinesis","lambda"],
-
-	"author": 
-	{
+	"keywords": [
+		"amazon",
+		"aws",
+		"kinesis",
+		"lambda"
+	],
+	"author": {
 		"name": "Ian Meyers",
 		"email": "meyersi@amazon.com"
 	},
-
 	"main": "index.js",
 	"license": "Apache-2.0",
-	"files": 
-	["index.js","lib/constants.js","lib/common.js","lib/kinesis-archiver.js","lib/archive-access.js","package.json","README.md","LICENSE.txt"]
+	"files": [
+		"index.js",
+		"lib/constants.js",
+		"lib/common.js",
+		"lib/kinesis-archiver.js",
+		"lib/archive-access.js",
+		"package.json",
+		"README.md",
+		"LICENSE.txt"
+	]
 }
